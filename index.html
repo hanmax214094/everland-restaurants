@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>愛寶樂園美食導覽 (雙語版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Noto Sans KR', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .filter-container {
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-open { background-color: #34d399; }
+        .status-break { background-color: #f59e0b; }
+        .status-closed { background-color: #ef4444; }
+        .lang-btn {
+            transition: all 0.3s ease;
+        }
+        .lang-btn.active {
+            background-color: #0369a1;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="text-center mb-6">
+             <div class="flex justify-center items-center mb-4 gap-2">
+                <button id="lang-tw" class="lang-btn active font-semibold py-2 px-4 rounded-lg bg-white border border-gray-300">
+                    <span class="mr-1">🇹🇼</span> 繁體中文
+                </button>
+                <button id="lang-kr" class="lang-btn font-semibold py-2 px-4 rounded-lg bg-white border border-gray-300">
+                    <span class="mr-1">🇰🇷</span> 한국어
+                </button>
+            </div>
+            <h1 id="main-title" class="text-3xl sm:text-4xl font-bold text-sky-700">愛寶樂園美食導覽 🍔</h1>
+            <p id="main-subtitle" class="mt-2 text-md sm:text-lg text-gray-500">Everland Restaurant Guide (에버랜드 레스토랑 가이드)</p>
+        </header>
+
+        <div class="filter-container p-4 sm:p-6 rounded-xl shadow-lg mb-8 sticky top-4 z-10 border border-gray-200">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div class="lg:col-span-1">
+                    <label id="label-search" for="search-input" class="block text-sm font-medium text-gray-700 mb-1">關鍵字搜尋</label>
+                    <input type="text" id="search-input" placeholder="搜尋餐廳、關鍵字..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
+                </div>
+                <div>
+                    <label id="label-zone" for="zone-filter" class="block text-sm font-medium text-gray-700 mb-1">所在園區</label>
+                    <select id="zone-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
+                        <option id="opt-all-zones" value="all">所有園區</option>
+                    </select>
+                </div>
+                <div>
+                    <label id="label-cuisine" for="cuisine-filter" class="block text-sm font-medium text-gray-700 mb-1">料理類型</label>
+                    <select id="cuisine-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
+                        <option id="opt-all-cuisines" value="all">所有類型</option>
+                    </select>
+                </div>
+                <button id="reset-button" class="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-300 font-semibold flex items-center justify-center">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    <span id="btn-reset-text">重設篩選</span>
+                </button>
+            </div>
+        </div>
+
+        <main id="restaurant-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8"></main>
+        
+        <div id="loading" class="text-center py-20">
+             <p id="loading-text" class="text-lg text-gray-500">正在處理餐廳資料...</p>
+        </div>
+
+        <div id="no-results" class="hidden text-center py-20">
+            <p id="no-results-title" class="text-2xl font-bold text-gray-400 mb-2">Oops!</p>
+            <p id="no-results-text" class="text-lg text-gray-500">找不到符合條件的餐廳，請試試其他關鍵字或放寬篩選條件。</p>
+        </div>
+
+    </div>
+
+    <script>
+        const restaurantJsonData = {
+            "faciltList": [
+                { "faciltId": "H100V05020", "faciltCateKindCd": "04", "faciltName": "차이나문", "faciltNameEng": "China Moon", "faciltDescrt": "<div style=\"display:none;\">짜장면 자장면 탕수육 중식 차이나 문</div>\n아이 어른 모두가 만족하는 차이니즈 레스토랑 차이나문!\n특별한 추억을 만들고 싶은 분에게는\n포시즌스 가든이 한 눈에 들어오는 창가 자리를 추천합니다.", "faciltDescrtEng": "Children and adults are all satisfied\nChinese Restaurant China Moon!\n\nIf you want to make special memories\nI recommend a window seat.\n\nFour Seasons Garden at a glance\nA million dollar garden view is free.", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "중식#탕수육#자장면#짬뽕#볶음밥 #차이나 문", "keywordDescrtEng": "chinese restaurant#sweet and sour pork#jajangmyeon#jjamppong#Fried Rice", "foodTypeCds": "02", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/5f0861faa2f540c28c80592222e50786.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29162", "lgtud": "127.20038" }] },
+                { "faciltId": "H100V05026", "faciltCateKindCd": "04", "faciltName": "알파인 레스토랑", "faciltNameEng": "Alpine Food Fair", "faciltDescrt": "<div style=\"display:none;\">돈까스</div>\n알프스 산장 어느 식당에 준비된\n따뜻하고 든든한 음식들\n돼지고기 김치찌개, 돈가스까지,\n취향 저격 알파인 레스토랑으로 쉬러오세요.\n\n• The Everland of Oz •\n- 블러드시티 메뉴 판매매장 -", "operStatusCd": "CLOS", "zoneKindCd": "05", "keywordDescrt": "김치찌개# 돈가스 #김치볶음밥#대게다리튀김#단체 #돈까스", "keywordDescrtEng": "Kimchi Jjigae#Korean food#Kimchi Fried Rice#Fried Crab Leg#", "foodTypeCds": "01", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/6f6c01f359b24c1f99adb58c30907242.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29080", "lgtud": "127.20452" }] },
+                { "faciltId": "H100V05087", "faciltCateKindCd": "04", "faciltName": "쿠치나 마리오", "faciltNameEng": "Cucina Mario(Lunch)", "faciltDescrt": "'마리오 아저씨의 부엌'이란 뜻의 피자&파스타 전문 레스토랑.\n포시즌스가든, 장미원이 보이는 그림 같은 전망과 함께\n쫄깃바삭한 화덕 피자와 풍부한 파스타의 맛을 즐겨보세요!\n\n• 모바일오더로 주문을 받고 음식을 서빙해드리는\n  테이블 서비스 매장입니다\n• 브레이크 타임: 16:00 ~ 17:00  (브레이크 타임 전 라스트오더 15:30)", "operStatusCd": "CLOS", "zoneKindCd": "05", "keywordDescrt": "양식#파스타#피자#샐러드#에이드 #쿠치나마리오", "keywordDescrtEng": "western restaurant#pasta#pizza#salad#ade", "foodTypeCds": "03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/b1940acdcfa449eb8d79e5d9b3c8fb96.jpg", "giftcardYn": "Y", "mobileOrderYn": "Y", "locList": [{ "latud": "37.29077238", "lgtud": "127.1994141" }] },
+                { "faciltId": "H100V05023", "faciltCateKindCd": "04", "faciltName": "한가람", "faciltNameEng": "Han-ga-ram", "faciltDescrt": "<div style=\"display:none;\">한식당, 한식, 김치찌개, 고등어구이, 소불고기, 계란말이</div>\n한식의 깔끔하고 정갈한 맛을 그대로 살려낸 에버랜드의\n소문난 맛집 한가람.\n\n포시즌스 가든에서 따뜻한 한식 한상을 즐겨보시는건 어떨까요?", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "한식당#김치찌개#고등어구이#소불고기#계란말이", "keywordDescrtEng": "Korean restaurant#KimchiJjigae###", "foodTypeCds": "01", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/72c418a8cd7b46a78f967a1bd368b771.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29057", "lgtud": "127.20116" }] },
+                { "faciltId": "H100V02025", "faciltCateKindCd": "04", "faciltName": "CGV 팝콘팩토리", "faciltNameEng": "CGV Popcorn Factory", "faciltDescrt": "락앤롤 아메리칸 어드벤처에서 즐겨보는 간식파티!\n 이곳으로 여행을 온 여러분들을 위한\n 다양한 간식 메뉴가 준비되어 있답니다.", "operStatusCd": "OVER", "zoneKindCd": "02", "keywordDescrt": "팝콘#핫도그#아이스티#에이드#탄산음료", "keywordDescrtEng": "popcorn#hot dog#ice tea#ade#sparkling drink", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/7ca4c7f3f623452f876efb99caeed3fb.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29307180", "lgtud": "127.2016870" }] },
+                { "faciltId": "H100V06091", "faciltCateKindCd": "04", "faciltName": "팝콘(사파리)", "faciltNameEng": "Popcorn(Safari)", "faciltDescrt": "톡톡 터지는 즐거움, 한 입의 팝콘으로 시작하세요\n귀엽고 특별한 캐릭터 팝콘통으로 추억까지 담아가면\n에버랜드 완벽 즐기기 성공!", "operStatusCd": "OVER", "zoneKindCd": "06", "keywordDescrt": "팝콘통#판다#호랑이#시나모롤#포차코", "keywordDescrtEng": "Popcorn Bucket#Panda#Tiger#Cinnamoroll#Pochaco", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/113f5cd467c34b3b8c37acc018437439.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29130801", "lgtud": "127.2043213" }] },
+                { "faciltId": "H100V01064", "faciltCateKindCd": "04", "faciltName": "팝콘(오리엔탈)", "faciltNameEng": "Popcorn(Oriental)", "faciltDescrt": "톡톡 터지는 즐거움, 한 입의 팝콘으로 시작하세요\n귀엽고 특별한 캐릭터 팝콘통으로 추억까지 담아가면\n에버랜드 완벽 즐기기 성공!", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "팝콘통#푸바오#호랑이#시나모롤#포차코", "keywordDescrtEng": "Popcorn Bucket#Fubao#Tiger#Cinnamoroll#Pochaco", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/bc34872dad114eae863930a2869d7e54.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29408501", "lgtud": "127.2032686" }] },
+                { "faciltId": "H100V05217", "faciltCateKindCd": "04", "faciltName": "슬로우야드 바베큐", "faciltNameEng": "slow yard BBQ", "faciltDescrt": "합정동 핫플레이스 ‘슬로우야드 바베큐’가\n에버랜드에 입점했다구요?\n낮은 온도에서 간접열로 서서히 익히는 방식인\n‘Low&Slow’ 조리방식으로 최대 12시간 이상\n참나무로 직접 훈연한 정통 미국식 바베큐를\n에버랜드에서도 즐겨보세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "바베큐#미국식BBQ#바베큐플래터#수제소시지#바베큐볶음밥", "keywordDescrtEng": "BBQ####", "foodTypeCds": "05,03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/296e5063cee949bba8c6a1b47918f547.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29028", "lgtud": "127.20039" }] },
+                { "faciltId": "H100V05219", "faciltCateKindCd": "04", "faciltName": "테라로사", "faciltNameEng": "Terarosa", "faciltDescrt": "커피 애호가들을 위한\n스페셜티 커피하우스,  테라로사에서\n꽃내음이 향긋한 정원과 함께,\n스페셜티 미식을 즐겨보세요.", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "스페셜티 커피#드립커피#카페", "keywordDescrtEng": "##", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/cede6e89f8c24a06b662a57efde1db21.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29118475", "lgtud": "127.1993264" }] },
+                { "faciltId": "H100V06076", "faciltCateKindCd": "04", "faciltName": "판다월드 카페", "faciltNameEng": "Panda World Cafe", "faciltDescrt": "사육사 아부지로부터 전수받은 시크릿 레시피에\n아셰프 만의 노하우를 더했다!\n\n아이바오가 준비한 맛있는 디저트를 맛볼 수 있는 카페", "operStatusCd": "OVER", "zoneKindCd": "06", "keywordDescrt": "커피#에이드#스무디#초코츄러스#워토우", "keywordDescrtEng": "Coffee#Ade#Smoothie#Chocolate Churros#Wotou", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/563bfa5b9d184f80af29214722e3faf0.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29320", "lgtud": "127.20286" }] },
+                { "faciltId": "H100V05019", "faciltCateKindCd": "04", "faciltName": "홀랜드 빌리지", "faciltNameEng": "Holland Village", "faciltDescrt": "네덜란드 델프트를 재현한 야외 노천 매장!\n바로 구워낸 BBQ 한 입에 시원한 맥주 한 잔,\n화려한 포시즌스 가든의 경치까지 곁들여보세요.\n\n• The Everland of Oz •\n- 에메랄드시티 메뉴 판매매장 -", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "생맥주#바비큐#볶음밥#떡볶이#피자 #홀랜드빌리지", "keywordDescrtEng": "#BBQ# Fried Rice#Tteokbokki#PIZZA", "foodTypeCds": "03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/5f30713ce87b41caa5d698a23a1e7d7c.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29033", "lgtud": "127.19996" }] },
+                { "faciltId": "H100V06086", "faciltCateKindCd": "04", "faciltName": "茶百道 차백도", "faciltNameEng": "Chapanda", "faciltDescrt": "중국 쓰촨성의 밀크티 프랜차이즈 차백도!\n에버랜드에서도 품질 좋은 재료를 기본으로\n밀크티와 에이드까지 신선함을 경험해 보세요!", "operStatusCd": "OVER", "zoneKindCd": "06", "keywordDescrt": "밀크티#라떼#스무디#과일에이드", "keywordDescrtEng": "###", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/431ea097e47a4866bd3495becce5b947.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29310742", "lgtud": "127.2045559" }] },
+                { "faciltId": "H100V03028", "faciltCateKindCd": "04", "faciltName": "타운즈 마켓 레스토랑", "faciltNameEng": "Town’s Market Restaurant", "faciltDescrt": "<div style=\"display:none;\">타운즈마켓</div>\n이솝빌리지 친구들이 찾는 동화같은 음식점,\n타운즈마켓에서 도란도란 이야기를 나누며\n특별한 만찬을 즐겨보세요.", "operStatusCd": "OVER", "zoneKindCd": "03", "keywordDescrt": "일식#우동#초밥#덮밥#돈가스 #타운즈마켓 #돈까스", "keywordDescrtEng": "Japanese restaurant#udon#sushi##Pork Cutlet", "foodTypeCds": "07", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/c4df02f698fa4a51b497840c534d8cda.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29324333", "lgtud": "127.1994996" }] },
+                { "faciltId": "H100V05016", "faciltCateKindCd": "04", "faciltName": "가든 테라스", "faciltNameEng": "Garden Terrace", "faciltDescrt": "아름다운 포시즌스 가든을 보며 즐기는 다채로운 메뉴의 향연!\n밤에는 화려한 야경과 함께 특별하고 즐거운 식사를 즐겨보세요.\n\n• The Everland of Oz •\n- 에메랄드시티 메뉴 판매매장 -", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "양식#떡볶이#페스츄리피자#카레라이스#비프스튜라이스 #가든테라스", "keywordDescrtEng": "Restaurant#Tteokbokki#Pastry Pizza#Curry Rice#Beef stew rice", "foodTypeCds": "05,03,06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/fa57f7f7554d412abba74eb18d7a253c.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29155434", "lgtud": "127.1998969" }] },
+                { "faciltId": "H100V05017", "faciltCateKindCd": "04", "faciltName": "가든 테라스(카페)", "faciltNameEng": "Garden Terrace (Cafe)", "faciltDescrt": "포시즌스 가든이 내려다 보이는 카페에서\n달달한 음료와 빵을 즐겨보세요.\n좋은 뷰는 덤이랍니다", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "커피#아이스초코#말차라떼#크림라떼#아이스티 #가든테라스", "keywordDescrtEng": "Coffee# Iced Chocolate#Matcha Latte#Cream Latte#Iced Tea", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/361451a5e6de4babba3b900ef8e94b7c.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29154", "lgtud": "127.20001" }] },
+                { "faciltId": "H100V05022", "faciltCateKindCd": "04", "faciltName": "매직타임 레스토랑", "faciltNameEng": "Magic Time Restaurant", "faciltDescrt": "시간과 공간을 넘나드는 맛있는 미각여행!\n이곳으로 여행을 온 여러분들을 위한\n다양한 메뉴가 준비되어 있답니다.", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "한식#우삼겹사골쌀국수#돈가스카레 #돈까스#김치짜글이#소불고기 #매직타임레스토랑", "keywordDescrtEng": "General Restaurant#Beef Brisket Ox-bone Soup Pho #Pork cutlet curry#kimchee stew#beef Bulgogi", "foodTypeCds": "01,02,05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/1fe98fbf0a024cf4ac395636e131392c.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29085", "lgtud": "127.20265" }] },
+                { "faciltId": "H100V05025", "faciltCateKindCd": "04", "faciltName": "알프스 쿠체", "faciltNameEng": "Alps Kuche", "faciltDescrt": "알프스 마을의 고즈넉한 식당을 그대로 옮겨 놓은 듯한 공간.\n식사와 스낵, 음료를 모두 즐길 수 있는 이곳에서\n유럽 노천카페의 분위기를 한껏 느껴보세요.\n\n• The Everland of Oz •\n- 블러드시티 메뉴 판매매장 -", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "양식#바비큐#치킨#떡볶이#우동 #알프스쿠체", "keywordDescrtEng": "western restaurant #Barbecue #Beer #Udon #PorkLip#BBQ Plate#Chicken#Tteokbokki#noodle", "foodTypeCds": "03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/8ce73a962dc648db8e26c39b20a69e85.png", "giftcardYn": "Y", "mobileOrderYn": "Y", "locList": [{ "latud": "37.29062279", "lgtud": "127.2039191" }] },
+                { "faciltId": "H100V01012", "faciltCateKindCd": "04", "faciltName": "오리엔탈 스테이션", "faciltNameEng": "Oriental Station", "faciltDescrt": "줄서는 핫플 맛집!\n외식 브랜드 팝업 메뉴를 만나보세요\n\n오리엔탈 자체 메뉴와 \n시즌별 변경되는 팝업스토어\n전용 메뉴들을 만나보실 수 있습니다.\n<div style=\"display:none;\">오리엔탈 레스토랑,오리엔탈레스토랑</div>", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "줄서는 맛집#라멘#우동#덮밥#팝업메뉴 #오리엔탈스테이션", "keywordDescrtEng": "####Pop-up menu", "foodTypeCds": "01,03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/b00f4456c84a4131aba7dc61a6de211c.jpg", "giftcardYn": "Y", "mobileOrderYn": "Y", "locList": [{ "latud": "37.29391", "lgtud": "127.20312" }] },
+                { "faciltId": "H100V06016", "faciltCateKindCd": "04", "faciltName": "카페 정글캠프", "faciltNameEng": "Cafe Jungle Camp", "faciltDescrt": "로스트 밸리, 아마존 정글, 사파리 월드로의 모험을 떠나기 위해\n든든하게 배를 채우는 준비는 필수!\n탐험가들을 위한 휴식처 카페 정글캠프로 놀러오세요", "operStatusCd": "OVER", "zoneKindCd": "06", "keywordDescrt": "스파게티#피자#치킨#커피#에이드 #정글카페 #카페정글", "keywordDescrtEng": "Spaghetti#Pizza#Chicken#Coffee#ade", "foodTypeCds": "05,04,06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/61e31ffa99f54c029bb3d97c0ed45098.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29177", "lgtud": "127.20436" }] },
+                { "faciltId": "H100V05024", "faciltCateKindCd": "04", "faciltName": "스낵 버스터", "faciltNameEng": "Snack Busters", "faciltDescrt": "시원한 맥주와 다양한 토핑이 곁들여진\n떡볶이와 치킨을 즐겨보세요\n\n• KPOP DEMON HUNTERS•\n\n※ 헌트릭스 세트에는 농심 한정판 <케이팝데몬헌터스>\n스페셜 신라면컵이 포함 되어있으며,\n캐릭터는 아래 일정과 같이 제공됩니다.\n(캐릭터 교환 불가)\n\n  - 9/26(금) ~ 10/5(일) / 10/20(월) ~ 10/26(일)  → 루미\n  - 10/6(월) ~ 10/12(일) / 10/27(월) ~ 11/2(일)    → 조이\n  - 10/13(월) ~ 10/19(일) / 11/3(월) ~  11/9(일)  → 미라\n  * 이후 일정 추후 공개\n<div style=\"display:none;\">스낵버스터, 스낵버스트</div>", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "소다팝#헌트릭스세트#사자보이즈세트#컵라면#스낵버스터 #케데헌", "keywordDescrtEng": "SODA POP#HUNTR/X SET#SAJA BOYS SET#fried#KPop demon hunters", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/354cf33148e743a18ba81ce84274e003.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29079166", "lgtud": "127.2035286" }] },
+                { "faciltId": "H100V02031", "faciltCateKindCd": "04", "faciltName": "이레컴퍼니(허리케인점)", "faciltNameEng": "Yire Company", "faciltDescrt": "EVER WISH SNACK\n에버랜드와 NCT WISH의\n청량한 콜라보 음료 팝핑슬러시와\n귀여운 레시 핫도그&와플을 즐겨보세요.", "operStatusCd": "OVER", "zoneKindCd": "02", "keywordDescrt": "팝핑슬러시#레시핫도그#레시와플#NCT엔씨티#이레컴퍼니", "keywordDescrtEng": "Popping Slush#Lessi hot dog#Lesh Whaffle (custard cream)#NCT#Yire Company", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/49143f4b598141f69adab32a6f38d4c5.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29389461", "lgtud": "127.2013241" }] },
+                { "faciltId": "H100V05133", "faciltCateKindCd": "04", "faciltName": "포메인", "faciltNameEng": "Phomein", "faciltDescrt": "햅쌀 본연의 깔끔한 향과 맛이 담긴 ‘햅쌀면‘\n매장에서 직접 끓인 ‘명품 육수’로 만든\n건강하고 맛있는 쌀국수를 만나보세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "쌀국수#프리미엄 소고기 쌀국수#소고기 볶음밥#짜조#치킨윙", "keywordDescrtEng": "rice noodles#premium beef rice noodles#beef fried rice#cha zio#chicken wing", "foodTypeCds": "07", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/5551e259c224462b8e5db5ddbda69b54.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29151401", "lgtud": "127.2004310" }] },
+                { "faciltId": "H100V05021", "faciltCateKindCd": "04", "faciltName": "버거카페 유럽", "faciltNameEng": "Burger Cafe Europe", "faciltDescrt": "버거카페에서 만나볼 수 있는 Premium Buger! \n버거카페 유럽만의 특급 레시피를 경험해 보세요.", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "패스트푸드#햄버거#감자튀김#치킨#비스켓", "keywordDescrtEng": "fastfood#Hamburger#fried#Chicken#biscuit", "foodTypeCds": "05,04", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/41a3c313e8364b32a4768b2ab74ba1c9.jpg", "giftcardYn": "Y", "mobileOrderYn": "Y", "locList": [{ "latud": "37.29114", "lgtud": "127.20167" }] },
+                { "faciltId": "H100V02012", "faciltCateKindCd": "04", "faciltName": "버거카페 아메리카", "faciltNameEng": "Burger Cafe America", "faciltDescrt": "어트랙션을 신나게 즐겼다면\n캘리포니아 분위기의 햄버거 가게\n버거카페 아메리카에서 식사하실래요?", "operStatusCd": "CLOS", "zoneKindCd": "02", "keywordDescrt": "패스트푸드#햄버거#감자튀김#치킨#비스켓", "keywordDescrtEng": "Festfood#Burger#French Fries#Chicken#", "foodTypeCds": "04,05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/74adf0b9a8944c3a880d8034b1becc1d.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29372", "lgtud": "127.20146" }] },
+                { "faciltId": "H100V02011", "faciltCateKindCd": "04", "faciltName": "KFC", "faciltNameEng": "KFC", "faciltDescrt": "신나는 어트랙션이 가득한\n아메리칸 어드벤처에서 즐기는 치킨과 햄버거!\n60년 전통의 신선하고 맛있는 치킨을 즐겨보세요", "operStatusCd": "OVER", "zoneKindCd": "02", "keywordDescrt": "햄버거#치킨#콜라#닭다리#비스켓 #케이에프씨", "keywordDescrtEng": "Hamburger #Biscuit#Chicken#Cola#Chicken drumstick#Biscuit", "foodTypeCds": "04,05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/e06593d08600415899b43ac1dba02dd8.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29271", "lgtud": "127.20149" }] },
+                { "faciltId": "H100V01028", "faciltCateKindCd": "04", "faciltName": "스타벅스", "faciltNameEng": "Starbucks", "faciltDescrt": "국내 최대 테마파크인 에버랜드에서 스타벅스를 경험할 수 있는 매장입니다.\n에버랜드점 특화 음료와 다양한 푸드 그리고 MD상품을 만나보세요!", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "카페#커피#샌드위치#케이크", "keywordDescrtEng": "café###", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/f45dcdd379cb4bafb482048da6f21142.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29479809", "lgtud": "127.2031888" }] },
+                { "faciltId": "H100V05111", "faciltCateKindCd": "04", "faciltName": "커피빈", "faciltNameEng": "coffee bean", "faciltDescrt": "가든뷰와 함께 즐기는 다양한 커피&티와\n한정 MD도 만나보세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "카페#커피#디저트#티#아이스블랜디드", "keywordDescrtEng": "Cafe#Coffee#Dessert#Tea#IceBlended", "foodTypeCds": "06,05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/9576d47f4e714652ae33ae8022294f8e.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29044245", "lgtud": "127.2006988" }] },
+                { "faciltId": "H100V01034", "faciltCateKindCd": "04", "faciltName": "라운지엑스", "faciltNameEng": "Lounge X", "faciltDescrt": "현재와 미래가 만나는 공간, 라운지엑스\n정밀한 바리스타 로봇이 선사하는 커피&디저트는 물론,\n상상력을 자극하는 독특한 경험으로 스타일리시한 여유를 만나보세요.", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "카페#로봇커피#로봇아이스크림 #커피#디저트", "keywordDescrtEng": "Café#RobotCoffee #RobotIceCream #Coffee#Dessert", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/1fcb4e8396684aaaa9e3b885018639d3.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29418", "lgtud": "127.20266" }] },
+                { "faciltId": "H100V02014", "faciltCateKindCd": "04", "faciltName": "뉴욕 센트럴 스낵", "faciltNameEng": "New York Central Snacks", "faciltDescrt": "미국 문화의 중심 뉴욕 맨해튼 거리를 배경으로 한 뉴욕 센트럴 스낵!\n뉴욕에 있는 듯한 착각을 일으키는 이곳에서\n맛있는 간식들이 여러분을 기다립니다.", "operStatusCd": "OVER", "zoneKindCd": "02", "keywordDescrt": "츄러스#핫도그#후라이드닭꼬치#훈제소시지#치킨", "keywordDescrtEng": "Churros#Hot Dog#Fried Chicken Skewer#Smoked Sausage#Chicken", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/8d682af9462147149986335b0e3ce6ac.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29372", "lgtud": "127.20177" }] },
+                { "faciltId": "H100V03030", "faciltCateKindCd": "04", "faciltName": "멀린스 스낵", "faciltNameEng": "Merlin’s Snack", "faciltDescrt": "스낵들아 맛있어져라 얍!\n마법처럼 달콤해진 츄러스와 핫도그\n이곳의 간식들은 어쩐지 더 맛있는 것 같네요!", "operStatusCd": "OVER", "zoneKindCd": "03", "keywordDescrt": "츄러스#핫도그#훈제소시지#돈꼬치#아이스티", "keywordDescrtEng": "Churros#Hot Dog#Smoked Sausage#Pork Skewer#IceTea", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/07dd563b8e1a4c6585b7b5cb83cc6f50.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29200736", "lgtud": "127.1990762" }] },
+                { "faciltId": "H100V06025", "faciltCateKindCd": "04", "faciltName": "아마존 스낵", "faciltNameEng": "Amazon snack", "faciltDescrt": "오늘은 어떤 스낵을 탐험해볼까?\n탐험가들의 단골 스낵점, 아마존 스낵은 지나가는 모든 이들을 환영합니다.", "operStatusCd": "OVER", "zoneKindCd": "06", "keywordDescrt": "츄러스#핫도그#후라이드닭꼬치#훈제소시지#아마존스낵", "keywordDescrtEng": "Churros#Hot Dog#Fried Chicken Skewer#Smoked Sausage#Amazon snack", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/3eddc6958f9f48aca49bec8a78c32718.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29170300", "lgtud": "127.2045155" }] },
+                { "faciltId": "H100V01042", "faciltCateKindCd": "04", "faciltName": "한와담 소반", "faciltNameEng": "Hanwadam", "faciltDescrt": "Est. 2013 한우.와인.담소 한와담의 가장 사랑받는 메뉴만을 선정하여\n정갈하게 담아낸 한와담소반, 맛있는 한식여행을 초대합니다.", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "한식전문#불고기 #전골 #갈비곰탕", "keywordDescrtEng": "Korean food restaurant#bulgogi  #jeongol#GalbiGomtang", "foodTypeCds": "01", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/8b1bbf90000d499b9696acde431bff36.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29506", "lgtud": "127.20340" }] },
+                { "faciltId": "H100V01041", "faciltCateKindCd": "04", "faciltName": "온더보더", "faciltNameEng": "On the Border", "faciltDescrt": "신선한 재료와 홈메이드 방식의 정통 멕시칸 레스토랑 온더보더!\n다양한 멕시코 요리와 함께 축제를 즐겨보세요!", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "멕시칸음식#타코#퀘사디아#화이타#부리또", "keywordDescrtEng": "MexicanFood#Taco#Quesadilla#Fajita#Burrito", "foodTypeCds": "03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/7ebfd6a2709344f4a13fba263cd21191.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29510", "lgtud": "127.20352" }] },
+                { "faciltId": "H100V01043", "faciltCateKindCd": "04", "faciltName": "크리스탈 제이드", "faciltNameEng": "Crystal Jade", "faciltDescrt": "전 세계 미식가들이 사랑하는 글로벌 차이니즈 레스토랑\n현지 셰프의 딤섬과 누들, 다채로운 중국 요리를 만나보세요.", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "쇼마이#딴딴면#완탕면#유니 짜장면#광동식 탕수육 크리스탈제이드", "keywordDescrtEng": "Shomai####", "foodTypeCds": "02", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/ab491f5c8b7241fabdfecf4a3bf334c0.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29520", "lgtud": "127.20377" }] },
+                { "faciltId": "H100V01045", "faciltCateKindCd": "04", "faciltName": "PIZZA IL FORNO", "faciltNameEng": "PIZZA IL FORNO", "faciltDescrt": "나폴리 피자 협회 'Vera Pizza' 인증을 세계 300번째,\n한국에서 첫번째로 인증 받은 '정통 나폴리 진수'를 이어\n정통 나폴리 화덕 피자와 파스타를 즐겨보세요!", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "화덕피자#파스타#스테이크#샐러드", "keywordDescrtEng": "Pizza###", "foodTypeCds": "03", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/d55073d7b0284c378c173fdd64353174.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29527", "lgtud": "127.20382" }] },
+                { "faciltId": "H100V01044", "faciltCateKindCd": "04", "faciltName": "폴바셋 에버랜드점", "faciltNameEng": "Paul Bassett", "faciltDescrt": "2003 WBC (World Barista Championship) 우승자 폴 바셋과\n함께하는 스폐셜티 커피 전문점.\u000B\u000B편안한 공간에서 시그니처 메뉴 룽고와\n상하목장 아이스크림이 올라간 아이스크림라떼를 즐겨보세요.", "operStatusCd": "OVER", "zoneKindCd": "01", "keywordDescrt": "커피 #디저트 #룽고 #아이스크림라떼", "keywordDescrtEng": "coffee #dessert #lungo #ice cream latte", "foodTypeCds": "06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/6a6a924d7623439b835cf387f47196e9.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29530488", "lgtud": "127.2038711" }] },
+                { "faciltId": "H100V05236", "faciltCateKindCd": "04", "faciltName": "요거트월드 에버랜드점", "faciltNameEng": "Yogurt world Everland", "faciltDescrt": "원하는 토핑을 취향대로 추가한\n달콤한 요거트아이스크림을 경험해보세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "요거트아이스크림#커피#콜드브루#과일에이드", "keywordDescrtEng": "yogurt icecream#coffee#coldbrew#fruit ade", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/8b546cfd0d9c479e85afcc7572da4a29.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29095324", "lgtud": "127.2036592" }] },
+                { "faciltId": "H100V05177", "faciltCateKindCd": "04", "faciltName": "55츄 (라피아자)", "faciltNameEng": "55 Chu (Rafias)", "faciltDescrt": "<div style=\"display:none;\">오오츄 오오추 55츄러스</div>\n반죽을 직접 뽑아 갓 튀겨 더욱 바삭하고 맛있는 츄러스!\n초코와 크림치즈 필링이 들어간 츄러스부터\n오레오를 듬뿍 묻힌 츄러스까지 다양한 맛을 경험하세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": " 수제츄러스#필링츄#컵츄#에이드#커피 오오츄 오오추", "keywordDescrtEng": "churros###Ade#Coffee", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/4d2751ef21ba443d948ace5b99b140f0.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29118", "lgtud": "127.20147" }] },
+                { "faciltId": "H100V05178", "faciltCateKindCd": "04", "faciltName": "앤티앤스 (라피아자)", "faciltNameEng": "Auntie Anne's (Lafias)", "faciltDescrt": "즉석으로 반죽부터 직접 만들고 구운 프레즐!\n버터를 묻혀 풍미 가득하고\n담백한 프레즐을 다양한 버전으로 즐겨 보세요!", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "수제프레즐#핫도그프레즐#커피#에이드", "keywordDescrtEng": "Handmade Fresle#Hotdog Fresle#Coffee#Ade", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/d9fe53cd9243471aaedaca8ef1faee4e.jpg", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29117653", "lgtud": "127.2015170" }] },
+                { "faciltId": "H100V05180", "faciltCateKindCd": "04", "faciltName": "BBQ", "faciltNameEng": "BBQ", "faciltDescrt": "Best of the Best Quality, BBQ\n세상에서 가장 맛있고 건강한\n최고 품질의 프리미엄 치킨\n<div style=\"display:none;\">bhc</div>", "operStatusCd": "OVER", "zoneKindCd": "05", "keywordDescrt": "치킨#뻥치콜#감자튀김#치즈볼#크런치순살크래커 #bhc", "keywordDescrtEng": "####", "foodTypeCds": "05", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/0d26686a89b4452e9cc0d1e931572e8e.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29185932", "lgtud": "127.2000414" }] },
+                { "faciltId": "H100V02026", "faciltCateKindCd": "04", "faciltName": "모노브레드(굿프렌즈캐빈점)", "faciltNameEng": "MONO BREAD(Good Friends Cabin)", "faciltDescrt": "이솝 동화 속 친구들과 즐겨보는 간식파티!\n 이곳으로 여행을 온 여러분들을 위한\n 다양한 간식 메뉴가 준비되어 있답니다.", "operStatusCd": "OVER", "zoneKindCd": "03", "keywordDescrt": "분식#떡볶이#어묵#커피#아이스크림", "keywordDescrtEng": "####", "foodTypeCds": "05,06", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/8fb63dc80a2b485a8be4708686577dfe.png", "giftcardYn": "Y", "mobileOrderYn": "N", "locList": [{ "latud": "37.29411593", "lgtud": "127.1996612" }] },
+                { "faciltId": "H100V05215", "faciltCateKindCd": "04", "faciltName": "Snow Peak Cafe & Dining", "faciltNameEng": "Snow Peak Cafe & Dining", "faciltDescrt": "자연을 담은 Cafe & Dining, Snow Peak의 철학을 담다.\nSnow Peak Cafe & Dining은 자연의 아름다움과 그 속에서 진정성 있는 경험을 소중히 여기며 자연과 사람,\n미식이 조화를 이루는 특별한 공간입니다.\n\nCafe - 연중 무휴\nDining - 매장 문의 (0507-1348-6881)\n\n운영시간\n11:00~20:00(Last Order 19:00)", "operStatusCd": "OVER", "zoneKindCd": "12", "keywordDescrt": "스노우 피크 카페", "keywordDescrtEng": "Snow Peak Cafe", "foodTypeCds": "03,06,07", "thumbImagUrl": "https://www.everland.com/contents/ia/facilities/2920867436cf4ad595b6079c4781d8ae.png", "giftcardYn": "N", "mobileOrderYn": "N", "locList": [{ "latud": "37.30132", "lgtud": "127.20107" }] }
+            ]
+        };
+        
+        const uiText = {
+            tw: {
+                title: "愛寶樂園美食導覽 🍔",
+                searchLabel: "關鍵字搜尋",
+                searchPlaceholder: "搜尋餐廳、關鍵字...",
+                zoneLabel: "所在園區",
+                allZones: "所有園區",
+                cuisineLabel: "料理類型",
+                allCuisines: "所有類型",
+                resetButton: "重設篩選",
+                loading: "正在處理餐廳資料...",
+                noResultsTitle: "Oops!",
+                noResultsText: "找不到符合條件的餐廳，請試試其他關鍵字或放寬篩選條件。",
+                mapButton: "在地圖上查看"
+            },
+            kr: {
+                title: "에버랜드 레스토랑 가이드 🍔",
+                searchLabel: "키워드 검색",
+                searchPlaceholder: "레스토랑, 키워드 검색...",
+                zoneLabel: "구역",
+                allZones: "모든 구역",
+                cuisineLabel: "요리 종류",
+                allCuisines: "모든 종류",
+                resetButton: "필터 초기화",
+                loading: "레스토랑 데이터를 처리하는 중...",
+                noResultsTitle: "이런!",
+                noResultsText: "조건에 맞는 레스토랑을 찾을 수 없습니다. 다른 키워드를 시도하거나 필터 조건을 완화해 주세요.",
+                mapButton: "지도에서 보기"
+            }
+        };
+        
+        const translations = {
+            zoneMap: {
+                "01": { tw: "環球集市", kr: "글로벌 페어" }, "02": { tw: "美洲冒險", kr: "아메리칸 어드벤처" },
+                "03": { tw: "魔術天地", kr: "매직랜드" }, "05": { tw: "歐洲冒險", kr: "유러피안 어드벤처" },
+                "06": { tw: "動物王國", kr: "주토피아" }, "12": { tw: "其他", kr: "기타" }
+            },
+            cuisineMap: {
+                "01": { tw: "韓式", kr: "한식" }, "02": { tw: "中式", kr: "중식" },
+                "03": { tw: "西式", kr: "양식" }, "04": { tw: "速食", kr: "패스트푸드" },
+                "05": { tw: "點心", kr: "스낵" }, "06": { tw: "咖啡/飲料", kr: "카페/음료" },
+                "07": { tw: "其他", kr: "기타" }
+            },
+            statusMap: {
+                "OPER": { tw: "營業中", kr: "영업 중", class: "status-open" },
+                "OVER": { tw: "營業中", kr: "영업 중", class: "status-open" },
+                "BREK": { tw: "休息中", kr: "휴식 중", class: "status-break" },
+                "CLOS": { tw: "已關閉", kr: "종료", class: "status-closed" }
+            },
+            nameMap: {
+                "차이나문": { tw: "中國月", kr: "차이나문" }, "알파인 레스토랑": { tw: "阿爾卑斯餐廳", kr: "알파인 레스토랑" },
+                "쿠치나 마리오": { tw: "庫奇納馬里奧", kr: "쿠치나 마리오" }, "한가람": { tw: "韓稼嵐", kr: "한가람" },
+                "CGV 팝콘팩토리": { tw: "CGV 爆米花工廠", kr: "CGV 팝콘팩토리" }, "팝콘(사파리)": { tw: "爆米花(野生動物世界)", kr: "팝콘(사파리)" },
+                "팝콘(오리엔탈)": { tw: "爆米花(東方)", kr: "팝콘(오리엔탈)" }, "슬로우야드 바베큐": { tw: "Slow Yard 烤肉", kr: "슬로우야드 바베큐" },
+                "테라로사": { tw: "Terarosa 咖啡", kr: "테라로사" }, "판다월드 카페": { tw: "熊貓世界咖啡廳", kr: "판다월드 카페" },
+                "홀랜드 빌리지": { tw: "荷蘭村", kr: "홀랜드 빌리지" }, "茶百道 차백도": { tw: "茶百道", kr: "차백도" },
+                "타운즈 마켓 레스토랑": { tw: "城鎮市集餐廳", kr: "타운즈 마켓 레스토랑" }, "가든 테라스": { tw: "花園露臺", kr: "가든 테라스" },
+                "가든 테라스(카페)": { tw: "花園露臺(咖啡廳)", kr: "가든 테라스(카페)" }, "매직타임 레스토랑": { tw: "魔法時光餐廳", kr: "매직타임 레스토랑" },
+                "알프스 쿠체": { tw: "阿爾卑斯廚房", kr: "알프스 쿠체" }, "오리엔탈 스테이션": { tw: "東方車站", kr: "오리엔탈 스테이션" },
+                "카페 정글캠프": { tw: "叢林營地咖啡廳", kr: "카페 정글캠프" }, "스낵 버스터": { tw: "小吃炸彈", kr: "스낵 버스터" },
+                "이레컴퍼니(허리케인점)": { tw: "Yire Company (颶風店)", kr: "이레컴퍼니(허리케인점)" }, "포메인": { tw: "Phomein 越南米粉", kr: "포메인" },
+                "버거카페 유럽": { tw: "歐洲漢堡咖啡館", kr: "버거카페 유럽" }, "버거카페 아메리카": { tw: "美洲漢堡咖啡館", kr: "버거카페 아메리카" },
+                "KFC": { tw: "肯德基", kr: "KFC" }, "스타벅스": { tw: "星巴克", kr: "스타벅스" },
+                "커피빈": { tw: "香啡繽", kr: "커피빈" }, "라운지엑스": { tw: "Lounge X", kr: "라운지엑스" },
+                "뉴욕 센트럴 스낵": { tw: "紐約中央點心", kr: "뉴욕 센트럴 스낵" }, "멀린스 스낵": { tw: "梅林點心", kr: "멀린스 스낵" },
+                "아마존 스낵": { tw: "亞馬遜點心", kr: "아마존 스낵" }, "한와담 소반": { tw: "韓瓦房 소반", kr: "한와담 소반" },
+                "온더보더": { tw: "On the Border", kr: "온더보더" }, "크리스탈 제이드": { tw: "翡翠拉麵小籠包", kr: "크리스탈 제이드" },
+                "PIZZA IL FORNO": { tw: "PIZZA IL FORNO", kr: "PIZZA IL FORNO" }, "폴바셋 에버랜드점": { tw: "Paul Bassett 愛寶樂園店", kr: "폴바셋 에버랜드점" },
+                "요거트월드 에버랜드점": { tw: "Yogurt World 愛寶樂園店", kr: "요거트월드 에버랜드점" }, "55츄 (라피아자)": { tw: "55 吉拿棒 (Piazza)", kr: "55츄 (라피아자)" },
+                "앤티앤스 (라피아자)": { tw: "Auntie Anne's (Piazza)", kr: "앤티앤스 (라피아자)" }, "BBQ": { tw: "BBQ 炸雞", kr: "BBQ" },
+                "모노브레드(굿프렌즈캐빈점)": { tw: "Mono Bread (好朋友小屋店)", kr: "모노브레드(굿프렌즈캐빈점)" },
+                "Snow Peak Cafe & Dining": { tw: "Snow Peak 咖啡與餐廳", kr: "Snow Peak Cafe & Dining" }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let currentLang = 'tw';
+            let allRestaurants = [];
+
+            const elements = {
+                langTw: document.getElementById('lang-tw'), langKr: document.getElementById('lang-kr'),
+                mainTitle: document.getElementById('main-title'), mainSubtitle: document.getElementById('main-subtitle'),
+                searchLabel: document.getElementById('label-search'), searchInput: document.getElementById('search-input'),
+                zoneLabel: document.getElementById('label-zone'), zoneFilter: document.getElementById('zone-filter'),
+                optAllZones: document.getElementById('opt-all-zones'), cuisineLabel: document.getElementById('label-cuisine'),
+                cuisineFilter: document.getElementById('cuisine-filter'), optAllCuisines: document.getElementById('opt-all-cuisines'),
+                resetButtonText: document.getElementById('btn-reset-text'), resetButton: document.getElementById('reset-button'),
+                restaurantList: document.getElementById('restaurant-list'), loadingText: document.getElementById('loading-text'),
+                loading: document.getElementById('loading'), noResultsTitle: document.getElementById('no-results-title'),
+                noResultsText: document.getElementById('no-results-text'), noResults: document.getElementById('no-results')
+            };
+            
+            function processRestaurantData(r) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = r.faciltDescrt;
+                const cleanDescription = tempDiv.textContent || tempDiv.innerText || "";
+                
+                return {
+                    id: r.faciltId,
+                    name: translations.nameMap[r.faciltName] || { tw: r.faciltNameEng, kr: r.faciltName },
+                    nameEng: r.faciltNameEng,
+                    description: { tw: cleanDescription.trim(), kr: cleanDescription.trim() },
+                    imgUrl: r.thumbImagUrl,
+                    status: translations.statusMap[r.operStatusCd] || { tw: "未知", kr: "알 수 없음", class: "bg-gray-400" },
+                    zone: translations.zoneMap[r.zoneKindCd] || { tw: "未知區域", kr: "알 수 없는 구역" },
+                    cuisines: r.foodTypeCds.split(',').map(c => translations.cuisineMap[c.trim()] || { tw: "其他", kr: "기타" }).filter(Boolean),
+                    keywords_kr: r.keywordDescrt.split('#').map(k => k.trim()).filter(Boolean),
+                    keywords_en: r.keywordDescrtEng ? r.keywordDescrtEng.split(/#|,/).map(k => k.trim()).filter(k => k && k !== '') : [],
+                    mobileOrder: r.mobileOrderYn === 'Y',
+                    giftcard: r.giftcardYn === 'Y',
+                    location: r.locList && r.locList[0] ? { lat: r.locList[0].latud, lng: r.locList[0].lgtud } : null
+                };
+            }
+            
+            function updateUI(lang) {
+                const text = uiText[lang];
+                document.documentElement.lang = lang === 'tw' ? 'zh-Hant' : 'ko';
+                elements.mainTitle.textContent = text.title;
+                elements.searchLabel.textContent = text.searchLabel;
+                elements.searchInput.placeholder = text.searchPlaceholder;
+                elements.zoneLabel.textContent = text.zoneLabel;
+                elements.optAllZones.textContent = text.allZones;
+                elements.cuisineLabel.textContent = text.cuisineLabel;
+                elements.optAllCuisines.textContent = text.allCuisines;
+                elements.resetButtonText.textContent = text.resetButton;
+                elements.loadingText.textContent = text.loading;
+                elements.noResultsTitle.textContent = text.noResultsTitle;
+                elements.noResultsText.textContent = text.noResultsText;
+                elements.langTw.classList.toggle('active', lang === 'tw');
+                elements.langKr.classList.toggle('active', lang === 'kr');
+            }
+
+            function setupFilters(lang) {
+                elements.zoneFilter.length = 1;
+                elements.cuisineFilter.length = 1;
+                const zones = [...new Set(allRestaurants.map(r => r.zone[lang]))].sort();
+                zones.forEach(zone => { elements.zoneFilter.add(new Option(zone, zone)); });
+                const cuisines = [...new Set(allRestaurants.flatMap(r => r.cuisines.map(c => c[lang])))].sort();
+                cuisines.forEach(cuisine => { elements.cuisineFilter.add(new Option(cuisine, cuisine)); });
+            }
+            
+            function renderRestaurants(restaurantsToRender, lang) {
+                elements.restaurantList.innerHTML = '';
+                elements.noResults.classList.toggle('hidden', restaurantsToRender.length > 0);
+
+                restaurantsToRender.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'card bg-white rounded-xl shadow-lg overflow-hidden';
+                    
+                    const cuisinesHTML = r.cuisines.map(c => `<span class="bg-sky-100 text-sky-800 text-xs font-semibold mr-2 mb-2 inline-block px-2.5 py-1 rounded-full">${c[lang]}</span>`).join('');
+                    
+                    const keywordsKrHTML = r.keywords_kr.map(k => `<span class="bg-gray-200 text-gray-700 text-xs font-medium mr-2 mb-2 px-2 py-1 rounded">${k}</span>`).join('');
+                    const keywordsEnHTML = r.keywords_en.map(k => `<span class="bg-gray-200 text-gray-700 text-xs font-medium mr-2 mb-2 px-2 py-1 rounded">${k}</span>`).join('');
+
+                    card.innerHTML = `
+                        <img class="h-48 w-full object-cover" src="${r.imgUrl}" alt="${r.name[lang]}" onerror="this.onerror=null;this.src='https://placehold.co/600x400/e2e8f0/64748b?text=Image+Not+Found';">
+                        <div class="p-5 flex-grow flex flex-col">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex-wrap">${cuisinesHTML}</div>
+                                <div class="text-sm font-semibold text-gray-500 text-right flex-shrink-0 ml-2">${r.zone[lang]}</div>
+                            </div>
+                            <h2 class="text-xl font-bold text-gray-900">${r.name[lang]}</h2>
+                            <p class="text-sm text-gray-500 mb-3">${r.nameEng}</p>
+                            <p class="text-xs text-gray-600 mb-4 flex-grow">${r.description[lang]}</p>
+                            
+                            <div class="mt-auto">
+                                <div class="pt-3 border-t border-gray-100">
+                                    <div class="mb-2 ${r.keywords_kr.length === 0 ? 'hidden' : ''}">
+                                        <h4 class="text-xs font-bold text-gray-500 mb-1">關鍵字 (KR)</h4>
+                                        <div class="flex flex-wrap">${keywordsKrHTML}</div>
+                                    </div>
+                                    <div class="${r.keywords_en.length === 0 ? 'hidden' : ''}">
+                                        <h4 class="text-xs font-bold text-gray-500 mb-1">Keywords (EN)</h4>
+                                        <div class="flex flex-wrap">${keywordsEnHTML}</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                                    <div class="flex items-center">
+                                        <span class="status-dot ${r.status.class}"></span>
+                                        <span class="text-sm font-semibold">${r.status[lang]}</span>
+                                        ${r.mobileOrder ? '<i class="fas fa-mobile-alt text-sky-600 ml-4" title="支援行動點餐"></i>' : ''}
+                                        ${r.giftcard ? '<i class="fas fa-gift text-emerald-600 ml-3" title="可使用禮品卡"></i>' : ''}
+                                    </div>
+                                    ${r.location ? `<a href="https://www.google.com/maps?q=${r.location.lat},${r.location.lng}" target="_blank" class="text-sm text-sky-600 font-semibold hover:text-sky-800 transition">${uiText[lang].mapButton} <i class="fas fa-map-marker-alt ml-1"></i></a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    elements.restaurantList.appendChild(card);
+                });
+            }
+
+            function filterAndSearch() {
+                const searchTerm = elements.searchInput.value.toLowerCase();
+                const selectedZone = elements.zoneFilter.value;
+                const selectedCuisine = elements.cuisineFilter.value;
+
+                const filtered = allRestaurants.filter(r => {
+                    const matchesSearch = searchTerm === '' || 
+                                          r.name.tw.toLowerCase().includes(searchTerm) ||
+                                          r.name.kr.toLowerCase().includes(searchTerm) ||
+                                          r.nameEng.toLowerCase().includes(searchTerm) ||
+                                          r.keywords_kr.some(k => k.toLowerCase().includes(searchTerm)) ||
+                                          r.keywords_en.some(k => k.toLowerCase().includes(searchTerm));
+                    
+                    const matchesZone = selectedZone === 'all' || r.zone[currentLang] === selectedZone;
+                    const matchesCuisine = selectedCuisine === 'all' || r.cuisines.some(c => c[currentLang] === selectedCuisine);
+
+                    return matchesSearch && matchesZone && matchesCuisine;
+                });
+                renderRestaurants(filtered, currentLang);
+            }
+            
+            function resetFilters() {
+                elements.searchInput.value = '';
+                elements.zoneFilter.value = 'all';
+                elements.cuisineFilter.value = 'all';
+                filterAndSearch();
+            }
+
+            function switchLanguage(lang) {
+                currentLang = lang;
+                updateUI(lang);
+                setupFilters(lang);
+                filterAndSearch();
+            }
+
+            // --- Initial Load ---
+            try {
+                allRestaurants = restaurantJsonData.faciltList.map(processRestaurantData);
+                elements.loading.classList.add('hidden');
+                
+                switchLanguage('tw'); // Default to Traditional Chinese
+                
+                elements.searchInput.addEventListener('input', filterAndSearch);
+                elements.zoneFilter.addEventListener('change', filterAndSearch);
+                elements.cuisineFilter.addEventListener('change', filterAndSearch);
+                elements.resetButton.addEventListener('click', resetFilters);
+                elements.langTw.addEventListener('click', () => switchLanguage('tw'));
+                elements.langKr.addEventListener('click', () => switchLanguage('kr'));
+
+            } catch(error) {
+                 console.error("處理內嵌 JSON 資料時出錯:", error);
+                 elements.loadingText.textContent = "處理餐廳資料時發生錯誤。";
+                 elements.loadingText.classList.add("text-red-500");
+            }
+        });
+    </script>
+
+</body>
+</html>
+
